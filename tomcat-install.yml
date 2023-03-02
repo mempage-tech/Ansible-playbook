@@ -1,0 +1,75 @@
+---
+- name: Install tomcat by using ansible
+  hosts: all
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+
+  tasks:
+  - name: Update and upgrade apt packages
+    apt:
+      upgrade: yes
+      update_cache: yes
+
+  - name: install JDK 11
+    apt:
+      name: openjdk-11-jdk
+      state: present
+  - name: add tomcat group
+    group:
+      name: tomcat
+
+  - name: add tomcat user
+    user:
+      name: tomcat
+      group: tomcat
+      home: /user/share/tomcat
+
+  - name: create tomcat directory
+    file:
+      path: /opt/tomcat
+      state: directory
+      mode: 0755
+
+  - name: download & install tomcat
+    unarchive:
+      src: https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.71/bin/apache-tomcat-9.0.71.tar.gz
+      dest: /opt/tomcat
+      remote_src: yes
+  - name: Change ownership of tomcat directory
+    file:
+      path: /opt/tomcat
+      owner: tomcat
+      group: tomcat
+      mode: "u+rwx,g+rx,o=rx"
+      recurse: yes
+      state: directory
+  - name: Creating a tomcat.service/ file
+    copy:
+      content: |-
+        [Unit]
+        Description=tomcat service
+        Requires=network.target
+        After=network.target
+
+        [Service]
+        Type=forking
+        User=tomcat
+        ExecStart=/opt/tomcat/apache-tomcat-9.0.71/bin/startup.sh
+        ExecStop=/opt/tomcat/apache-tomcat-9.0.71/bin/shutdown.sh
+        User=tomcat
+        Restart=on-abort
+        TimeoutSec=600
+
+        [Install]
+        WantedBy=multi-user.target
+      dest: /etc/systemd/system/tomcat.service
+  - name: Reload the SystemD to re-read configurations
+    systemd:
+      daemon-reload: yes
+  - name: Enable the tomcat service and start
+    systemd:
+      name: tomcat
+      enabled: yes
+      state: started
+...
